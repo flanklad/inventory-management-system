@@ -1,0 +1,166 @@
+openapi: 3.0.3
+
+info:
+  title: Inventory Management API
+  description: API for managing items, stock levels, and stock movements.
+  version: 1.0.0
+
+servers:
+  - url: http://127.0.0.1:8000
+    description: Local development server
+
+paths:
+  /items:
+    get:
+      summary: List items
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [ok, low, out] } }
+        - { name: name, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: A list of matching items.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/InventoryEntry' } }
+    post:
+      summary: Register a new item
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/NewItem' } }
+      responses:
+        '201':
+          description: Item created.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/InventoryEntry' } }
+        '422': { description: Validation error. }
+
+  /items/{item_id}:
+    get:
+      summary: View a single item
+      parameters:
+        - { name: item_id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The requested item.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/InventoryEntry' } }
+        '404':
+          description: No item with that ID.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Error' } }
+    patch:
+      summary: Update an item's editable fields
+      parameters:
+        - { name: item_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/ItemUpdate' } }
+      responses:
+        '200':
+          description: The updated item.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/InventoryEntry' } }
+        '404':
+          description: No item with that ID.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Error' } }
+        '422': { description: Validation error. }
+
+  /items/{item_id}/movements:
+    get:
+      summary: List an item's stock movement history
+      parameters:
+        - { name: item_id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The movement history, newest first.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Movement' } }
+        '404':
+          description: No item with that ID.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Error' } }
+    post:
+      summary: Record a stock movement (restock or consume)
+      description: >
+        Creates a RESTOCK or CONSUME movement, which changes the item's
+        quantity on hand. Consuming more than is in stock is rejected.
+      parameters:
+        - { name: item_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/NewMovement' } }
+      responses:
+        '201':
+          description: Movement recorded; includes the resulting quantity.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Movement' } }
+        '404':
+          description: No item with that ID.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Error' } }
+        '422':
+          description: Business rule violation (e.g. insufficient stock to consume).
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Error' } }
+
+components:
+  schemas:
+    NewItem:
+      type: object
+      required: [item_name, category, unit, initial_quantity, reorder_level, storage_location]
+      properties:
+        item_name: { type: string, example: Coffee Beans }
+        category: { type: string, enum: [PANTRY, WASHROOM, ONBOARDING] }
+        unit: { type: string, enum: [PIECES, KG, LITERS, PACKETS] }
+        initial_quantity: { type: number, example: 20 }
+        reorder_level: { type: number, example: 5 }
+        supplier: { type: string, nullable: true, example: Acme Supplies }
+        storage_location: { type: string, example: Shelf A3 }
+
+    ItemUpdate:
+      type: object
+      description: All fields optional - only provided fields change.
+      properties:
+        reorder_level: { type: number, example: 8 }
+        supplier: { type: string, example: New Supplier Co }
+        storage_location: { type: string, example: Shelf B1 }
+
+    InventoryEntry:
+      type: object
+      properties:
+        item_id: { type: string, example: "a1b2c3" }
+        item_name: { type: string, example: Coffee Beans }
+        category: { type: string, example: PANTRY }
+        unit: { type: string, example: KG }
+        quantity_on_hand: { type: number, example: 20 }
+        reorder_level: { type: number, example: 5 }
+        status: { type: string, enum: [ok, low, out], example: ok }
+
+    NewMovement:
+      type: object
+      required: [type, quantity]
+      properties:
+        type: { type: string, enum: [RESTOCK, CONSUME], example: RESTOCK }
+        quantity: { type: number, example: 10, description: Must be greater than 0. }
+        note: { type: string, nullable: true, example: Weekly delivery }
+
+    Movement:
+      type: object
+      properties:
+        movement_id: { type: string, example: "m-0001" }
+        item_id: { type: string, example: "a1b2c3" }
+        type: { type: string, enum: [RESTOCK, CONSUME], example: RESTOCK }
+        quantity: { type: number, example: 10 }
+        resulting_quantity_on_hand: { type: number, example: 30 }
+        timestamp: { type: string, format: date-time, example: "2026-08-18T09:30:00Z" }
+        note: { type: string, nullable: true, example: Weekly delivery }
+
+    Error:
+      type: object
+      properties:
+        detail: { type: string, example: "Insufficient stock: 5 on hand, tried to consume 8." }
