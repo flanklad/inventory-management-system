@@ -1,54 +1,53 @@
-import sqlite3
+from sqlalchemy import create_engine, Column, String, Float, ForeignKey
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-DB_PATH = "inventory.db"
+DATABASE_URL = "sqlite:///inventory.db"
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine)
 
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+class Base(DeclarativeBase):
+    pass
+
+
+class ItemORM(Base):
+    __tablename__ = "items"
+
+    item_id = Column(String, primary_key=True)
+    item_name = Column(String, nullable=False)
+    category = Column(String, nullable=False)
+    unit = Column(String, nullable=False)
+    reorder_level = Column(Float, nullable=False)
+    supplier = Column(String)
+    cost_per_unit = Column(Float)
+    storage_location = Column(String)
+
+
+class InventoryEntryORM(Base):
+    __tablename__ = "inventory_entries"
+
+    entry_id = Column(String, primary_key=True)
+    item_id = Column(String, ForeignKey("items.item_id"), nullable=False)
+    quantity_on_hand = Column(Float, nullable=False)
+    last_updated = Column(String, nullable=False)
+
+
+class MovementORM(Base):
+    __tablename__ = "movements"
+
+
+    movement_id = Column(String, primary_key=True)
+    item_id = Column(String, ForeignKey("items.item_id"), nullable=False)
+    quantity = Column(Float, nullable=False)
+    timestamp = Column(String, nullable=False)
+    movement_type = Column(String, nullable=False)
+    supplier = Column(String)
+    unit_cost = Column(Float)
+    total_cost = Column(Float)
+    expiry_date = Column(String)
+    note = Column(String)
 
 
 def init_db():
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS items(
-            item_id TEXT PRIMARY KEY,
-            item_name TEXT NOT NULL,
-            category TEXT NOT NULL,
-            unit TEXT NOT NULL,
-            reorder_level REAL NOT NULL,
-            supplier TEXT,
-            cost_per_unit REAL,
-            storage_location TEXT
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS inventory_entries (
-            entry_id TEXT PRIMARY KEY,
-            item_id TEXT NOT NULL REFERENCES items(item_id),
-            quantity_on_hand REAL NOT NULL,
-            last_updated TEXT NOT NULL
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS movements (
-            movement_id TEXT PRIMARY KEY,
-            item_id TEXT NOT NULL REFERENCES items(item_id),
-            quantity REAL NOT NULL,
-            timestamp TEXT NOT NULL,
-            movement_type TEXT NOT NULL,
-            supplier TEXT,
-            unit_cost REAL,
-            total_cost REAL,
-            expiry_date TEXT,
-            note TEXT
-        )
-    """)
-
-    conn.commit()
-    conn.close()
+    Base.metadata.create_all(engine)

@@ -1,6 +1,7 @@
 from repositories.db import init_db
-from repositories.item_repository import SQLiteItemRepository
-from repositories.movement_repository import SQLiteMovementRepository
+from repositories.inventory_entry_repository import SqlAlchemyInventoryEntryRepository
+from repositories.item_repository import SqlAlchemyItemRepository
+from repositories.movement_repository import SqlAlchemyMovementRepository
 from services.catalog_service import CatalogService
 from services.stock_service import StockService
 from services.query_service import QueryService
@@ -12,8 +13,9 @@ from datetime import date
 
 init_db()
 
-item_repo = SQLiteItemRepository()
-movement_repo = SQLiteMovementRepository()
+entry_repo = SqlAlchemyInventoryEntryRepository()
+item_repo = SqlAlchemyItemRepository(entry_repo)
+movement_repo = SqlAlchemyMovementRepository()
 catalog_service = CatalogService(item_repo)
 stock_service = StockService(item_repo, movement_repo)
 query_service = QueryService(item_repo, movement_repo)

@@ -3,6 +3,24 @@ from models.inventory_entry import InventoryEntry
 from models.movement import Movement
 
 
+class InventoryEntryRepository(ABC):
+    @abstractmethod
+    def add(self, entry: InventoryEntry) -> None:
+        pass
+
+    @abstractmethod
+    def get_by_item_id(self, item_id: str) -> InventoryEntry:
+        pass
+
+    @abstractmethod
+    def update(self, entry: InventoryEntry) -> None:
+        pass
+
+    @abstractmethod
+    def list_all(self) -> list[InventoryEntry]:
+        pass
+
+
 class ItemRepository(ABC):
     @abstractmethod
     def add(self, entry: InventoryEntry) -> None:
